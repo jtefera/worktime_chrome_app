@@ -20,6 +20,15 @@ var hoursSpan = document.getElementById("hours"),
     totalTimeBeforeStart = 0,
     listPeriods = [];
 
+//Retrieving list from previous sessions
+chrome.storage.local.get('list', function(item) {
+  listPeriods = item.list
+  if(listPeriods.length){
+    renderListPeriods()
+  }
+})
+
+
 startStopBtn.addEventListener("click", function() {
   var action = startStopBtn.textContent.trim();
   if(action === "Start!") {
@@ -36,6 +45,9 @@ restartBtn.addEventListener("click", function() {
   timer = 0;
   renderFromTimer(timer);
   renderTotalTIme(totalTime);
+  chrome.storage.local.set({
+    'list': listPeriods
+  })
   if(startInterval) {
     startStopBtn.textContent = "Start!"
     clearInterval(startInterval);
@@ -97,7 +109,15 @@ function stop() {
   addToList({
     listPeriods,
     localTimeStartInterval,
-    periodTimer: timer});
+    periodTimer: timer})
+  //Save to local
+  chrome.storage.local.set({
+    'list': listPeriods,
+    'str': "hola",
+    "obj": {
+      "a": 2
+    }
+  })
   renderListPeriods();
   timer = 0;
   renderFromTimer(timer);
@@ -125,7 +145,7 @@ function renderListPeriods() {
     var today = new Date(),
         dateLi = document.createElement("li"),
         boldDay = document.createElement("b");
-    boldDay.textContent = (dayObj.date === today.toDateString()) ?
+    boldDay.textContent = (dayObj.date === dmyFromDate(today)) ?
                           "Today"
                           : dayObj.date;
     dateLi.appendChild(boldDay);
@@ -158,19 +178,31 @@ const addToList = (params) => {
 
   let listPer = params.listPeriods || listPeriods,
       lcTimeStartDate = params.localTimeStartInterval,
-      periodTimer  = params.periodTimer,
-      today = params.today || new Date(), //today can be passed for tests
-      isLastPeriodSameDateAddPeriod;
+      periodTimer  = params.periodTimer;
+  var lcTimeStopDate = params.localcTimeStopInterval || new Date(), //lcTimeStopDate can be passed for tests
+      isLastPeriodSameDateAddPeriod,
+      isBegAndEndPeriodSameDay =
+              dmyFromDate(lcTimeStartDate) === dmyFromDate(lcTimeStopDate);
 
+  //Case Start and finish of the period are on differnt dates
+  if(!isBegAndEndPeriodSameDay){
+    var lcTimeStopReal = lcTimeStopDate,
+        lcTimeEndDay = new Date(lcTimeStartDate.toDateString() + " 23:59:59"),
+        periodFromPeriodStartToEndDay = lcTimeEndDay.getTime()
+                                        - lcTimeStartDate.getTime(),
+        lcTimeStopDate = lcTimeEndDay;
+    var periodTimerNextDays = periodTimer - periodFromPeriodStartToEndDay;
+        periodTimer = periodFromPeriodStartToEndDay
+  }
   //Case is not firsta adquisition
   if(listPer.length) {
     var lastPeriodDate = listPer[0].date;
     isLastPeriodSameDateAddPeriod =
-            lastPeriodDate === lcTimeStartDate.toDateString();
+            lastPeriodDate === dmyFromDate(lcTimeStartDate);
   }
 
   var lcTimeStartStr = hmFromDate(lcTimeStartDate),
-      lcTimestopStr = hmFromDate(today),
+      lcTimestopStr = hmFromDate(lcTimeStopDate),
       intervalStr = (lcTimeStartStr === lcTimestopStr)?
                     lcTimeStartStr + ": "
                     : lcTimeStartStr + "-" + lcTimestopStr + ": ",
@@ -183,10 +215,24 @@ const addToList = (params) => {
   } else {
     //Case different days or this is the first adquisition
     var newDayOnList = {};
-    newDayOnList.date = lcTimeStartDate.toDateString();
+    newDayOnList.date = dmyFromDate(lcTimeStartDate);
     newDayOnList.periods = [itemStr];
     newDayOnList.totalOfDay = periodTimer;
     listPer.unshift(newDayOnList);
+  }
+
+  if(!isBegAndEndPeriodSameDay) {
+    let nextDayStart = lcTimeStartDate
+    nextDayStart.setDate(lcTimeStartDate.getDate() + 1)
+    nextDayStart.setHours(0)
+    nextDayStart.setMinutes(0)
+    nextDayStart.setSeconds(0)
+
+    let newParams = Object.assign({}, params, {
+            localTimeStartInterval: nextDayStart,
+            periodTimer: periodTimerNextDays
+        })
+    addToList(newParams)
   }
   return listPer;
 
@@ -202,7 +248,7 @@ const testAddPeriod = () => {
       intervalStr =  "10:20: 4sec",
       listAft = [
         {
-          date: new Date("12/10/2015 10:20").toDateString(),
+          date: dmyFromDate(new Date("12/10/2015 10:20")),
           periods: [intervalStr],
           totalOfDay: 4000,
         }
@@ -210,7 +256,7 @@ const testAddPeriod = () => {
       params1 = {
         listPeriods: listBef,
         localTimeStartInterval: new Date("12/10/2015 10:20:00"),
-        today: new Date("12/10/2015 10:20:04"),
+        localcTimeStopInterval: new Date("12/10/2015 10:20:04"),
         periodTimer: 4000
       }
   console.log("1 AddPeriod: Case add period to empty array");
@@ -221,7 +267,7 @@ const testAddPeriod = () => {
       intervalStr2 =  "10:20-10:21: 4sec",
       listAft2 = [
         {
-          date: new Date("12/10/2015 10:20").toDateString(),
+          date: dmyFromDate(new Date("12/10/2015 10:20")),
           periods: [intervalStr2],
           totalOfDay: 4000,
         }
@@ -229,7 +275,7 @@ const testAddPeriod = () => {
       params2 = {
         listPeriods: listBef2,
         localTimeStartInterval: new Date("12/10/2015 10:20:00"),
-        today: new Date("12/10/2015 10:21:04"),
+        localcTimeStopInterval: new Date("12/10/2015 10:21:04"),
         periodTimer: 4000
       }
   console.log("2 AddPeriod: Case add period to empty array different hm");
@@ -238,14 +284,14 @@ const testAddPeriod = () => {
   //Case adding period to non empty array. Same Day
   let listBef3 = [
         {
-          date: new Date("12/10/2015 9:20").toDateString(),
+          date: dmyFromDate(new Date("12/10/2015 9:20")),
           periods: ["09:20-09:21: 4sec"],
           totalOfDay: 4000,
         }
       ],
       listAft3 = [
         {
-          date: new Date("12/10/2015 9:20").toDateString(),
+          date: dmyFromDate(new Date("12/10/2015 9:20")),
           periods: [
                     "10:20-10:21: 4sec",
                     "09:20-09:21: 4sec"
@@ -256,7 +302,7 @@ const testAddPeriod = () => {
       params3 = {
         listPeriods: listBef3,
         localTimeStartInterval: new Date("12/10/2015 10:20:00"),
-        today: new Date("12/10/2015 10:21:04"),
+        localcTimeStopInterval: new Date("12/10/2015 10:21:04"),
         periodTimer: 4000
       }
   console.log("3 AddPeriod: Case add period to non empty list. Same Day");
@@ -265,19 +311,19 @@ const testAddPeriod = () => {
   //Case adding period to non empty array. Different Date
   let listBef4 = [
         {
-          date: new Date("12/10/2015 9:20").toDateString(),
+          date: dmyFromDate(new Date("12/10/2015 9:20")),
           periods: ["09:20-09:21: 4sec"],
           totalOfDay: 4000,
         }
       ],
       listAft4 = [
         {
-          date: new Date("12/11/2015 10:20").toDateString(),
+          date: dmyFromDate(new Date("12/11/2015 10:20")),
           periods: ["10:20-10:21: 10sec"],
           totalOfDay: 10000,
         },
         {
-          date: new Date("12/10/2015 9:20").toDateString(),
+          date: dmyFromDate(new Date("12/10/2015 9:20")),
           periods: ["09:20-09:21: 4sec"],
           totalOfDay: 4000,
         }
@@ -285,11 +331,35 @@ const testAddPeriod = () => {
       params4 = {
         listPeriods: listBef4,
         localTimeStartInterval: new Date("12/11/2015 10:20:00"),
-        today: new Date("12/11/2015 10:21:04"),
+        localcTimeStopInterval: new Date("12/11/2015 10:21:04"),
         periodTimer: 10000
       }
-      console.log("4 AddPeriod: Case add period to non empty list. Different Day");
-      expect(addToList(params4)).toEqual(listAft4);
+  console.log("4 AddPeriod: Case add period to non empty list. Different Day");
+  expect(addToList(params4)).toEqual(listAft4);
+
+  //Case adding period to empty array. Beg and End Period on different dates
+  let listBef5 = [],
+      listAft5 = [
+        {
+          date: dmyFromDate(new Date("12/14/2015 GMT-0800")),
+          periods: ["00:00: 5sec"],
+          totalOfDay: 5000,
+        },
+        {
+          date: dmyFromDate(new Date("12/13/2015 GMT-0800")),
+          periods: ["23:59: 59sec"],
+          totalOfDay: 59000,
+        }
+      ],
+      params5 = {
+        listPeriods: listBef5,
+        localTimeStartInterval: new Date("12/13/2015 23:59:00 GMT-0800"),
+        localcTimeStopInterval: new Date("12/14/2015 00:00:04 GMT-0800"),
+        periodTimer: 64000
+      }
+      console.log("5 AddPeriod: Case adding period to empty array."
+                  + "Beg and End Period on different dates");
+      expect(addToList(params5)).toEqual(listAft5);
 
 }
 
@@ -412,8 +482,23 @@ function testHmsFromTimer() {
 
 }
 
+const dmyFromDate = (date) => {
+  return  date.getDate() + "-"
+          + (date.getMonth() + 1) + "-"
+          + date.getFullYear()
+}
+
+const testDmyFromDate = () => {
+  let date1 = new Date("12/10/2016"),
+      dmy1 = "10-12-2016"
+
+  expect(dmyFromDate(date1)).toEqual(dmy1);
+
+}
+
 const tests = () => {
   testHmsFromTimer()
+  testDmyFromDate()
   testAddPeriod()
   console.log("All Tests Passed!")
 }
@@ -421,6 +506,7 @@ const tests = () => {
 tests();
 
 function hmFromDate(date) {
+
   var hours = date.getHours(),
       minutes = date.getMinutes(),
       hoursStr = (hours.toString().length <= 1) ?
