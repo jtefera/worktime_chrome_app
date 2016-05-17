@@ -18,44 +18,62 @@ var hoursSpan = document.getElementById("hours"),
     localTimeStartInterval,
     totalTime = 0,
     totalTimeBeforeStart = 0,
-    listPeriods = [];
+    listPeriods = []
 
 //Retrieving list from previous sessions
-chrome.storage.local.get('list', function(item) {
-  listPeriods = item.list
-  if(listPeriods.length){
-    renderListPeriods()
+
+const saveListPeriodsToLocal = (callback) => {
+  chrome.storage.local.set({
+    'list': listPeriods
+  }, callback)
+}
+
+const setListPeriodsFromLocal = (callback) => {
+  chrome.storage.local.get('list', function(item) {
+    listPeriods = item.list
+    if(callback) callback()
+  })
+}
+
+const initApp = () => {
+  setListPeriodsFromLocal(() => {
+    if(listPeriods.length){
+      renderListPeriods()
+      if(listPeriods[0].date === dmyFromDate(new Date())){
+        totalTime = totalTimeDay(listPeriods[0].periods)
+      }
+      renderTotalTime(totalTime)
+    }
+  })
+}
+//Set initial list view
+initApp()
+
+startStopBtn.addEventListener("click", function() {
+  var action = startStopBtn.textContent.trim()
+  if(action === "Start!") {
+    start()
+  } else if(action === "Stop!") {
+    stop()
+  } else {
+    throw("Err: startStopBtn is not 'Start!' or 'Stop!' but " + action)
   }
 })
 
-
-startStopBtn.addEventListener("click", function() {
-  var action = startStopBtn.textContent.trim();
-  if(action === "Start!") {
-    start();
-  } else if(action === "Stop!") {
-    stop();
-  } else {
-    throw("Err: startStopBtn is not 'Start!' or 'Stop!' but " + action);
-  }
-});
-
 restartBtn.addEventListener("click", function() {
-  totalTime -= timer;
-  timer = 0;
-  renderFromTimer(timer);
-  renderTotalTIme(totalTime);
-  chrome.storage.local.set({
-    'list': listPeriods
-  })
+  totalTime -= timer
+  timer = 0
+  renderFromTimer(timer)
+  renderTotalTime(totalTime)
+  saveListPeriodsToLocal()
   if(startInterval) {
     startStopBtn.textContent = "Start!"
-    clearInterval(startInterval);
+    clearInterval(startInterval)
   }
-});
+})
 
 clearAllBtn.addEventListener("click", function() {
-  clearComfirmBoxDiv.style.display = "block";
+  clearComfirmBoxDiv.style.display = "block"
 })
 
 clearCanceledBtn.addEventListener("click", function() {
@@ -69,7 +87,7 @@ clearComfirmedBtn.addEventListener("click", function() {
   timer = 0;
   totalTime = 0;
   renderFromTimer(timer);
-  renderTotalTIme(timer);
+  renderTotalTime(timer);
   //Stop all process
   if(startInterval){
     startStopBtn.textContent = "Start!"
@@ -85,13 +103,18 @@ function start() {
   startStopBtn.textContent = "Stop!";
   timeStartInterval = Date.now();
   timerBeforeStart = timer;
-  totalTimeBeforeStart = totalTime;
+
+  if(listPeriods[0] && listPeriods[0].date === dmyFromDate(localTimeStartInterval)) {
+    totalTimeBeforeStart = listPeriods[0].totalOfDay
+  } else {
+    totalTimeBeforeStart = 0;
+  }
   startInterval = setInterval(function() {
     timeNow = Date.now();
     timer = timerBeforeStart + timeNow - timeStartInterval;
     totalTime = totalTimeBeforeStart + timeNow - timeStartInterval;
     renderFromTimer(timer);
-    renderTotalTIme(totalTime);
+    renderTotalTime(totalTime);
   }, 1000);
 }
 
@@ -111,20 +134,14 @@ function stop() {
     localTimeStartInterval,
     periodTimer: timer})
   //Save to local
-  chrome.storage.local.set({
-    'list': listPeriods,
-    'str': "hola",
-    "obj": {
-      "a": 2
-    }
-  })
+  saveListPeriodsToLocal()
   renderListPeriods();
   timer = 0;
   renderFromTimer(timer);
 
 }
 
-function renderFromTimer(timer) {
+function renderFromTimer(timer = timer) {
   var HMSObj = hmsFromTimer(timer);
   hoursSpan.textContent = HMSObj.HH;
   minutesSpan.textContent = HMSObj.MM;
@@ -140,7 +157,7 @@ function renderListPeriods() {
   while(listTimesUl.firstChild) {
     listTimesUl.removeChild(listTimesUl.firstChild);
   }
-  listPeriods.map(function(dayObj) {
+  listPeriods.map(function(dayObj, dayId) {
     //Date Part
     var today = new Date(),
         dateLi = document.createElement("li"),
@@ -158,17 +175,38 @@ function renderListPeriods() {
     listTimesUl.appendChild(totalOfDayLi);
 
     //Periods Parts
-    dayObj.periods.map(function(period) {
-      var newPeriodLi = document.createElement("li");
+    dayObj.periods.map(function(period, periodId) {
+      var newPeriodLi = document.createElement("li"),
+          newEraseLink = document.createElement("a"),
+          paramEraseFunc = {
+            idDay: dayId,
+            idPeriod: periodId
+          }
 
-      newPeriodLi.textContent = period;
+      newPeriodLi.textContent = period.str
+
+      newEraseLink.textContent = "Erase"
+      newEraseLink.setAttribute('href', '#')
+      newEraseLink.addEventListener("click", (e) => {
+        e.preventDefault()
+        erasePeriod(paramEraseFunc)
+        saveListPeriodsToLocal(() => {
+          renderListPeriods()
+          totalTime = totalTimeOfToday(listPeriods)
+          renderTotalTime(totalTime)
+        })
+        //renderListPeriods()
+      })
+
+      newPeriodLi.appendChild(newEraseLink)
       listTimes.appendChild(newPeriodLi);
+
     });
   });
 }
 
-function renderTotalTIme(totalTime) {
-  totalTimeH4.textContent = "Total Time: " + hmsFromTimer(totalTime).hms;
+function renderTotalTime(totalTime) {
+  totalTimeH4.textContent = "Total Time of Day: " + hmsFromTimer(totalTime).hms;
 }
 
 const addToList = (params) => {
@@ -207,16 +245,23 @@ const addToList = (params) => {
                     lcTimeStartStr + ": "
                     : lcTimeStartStr + "-" + lcTimestopStr + ": ",
       timerStr = hmsFromTimer(periodTimer).hms,
-      itemStr = intervalStr + timerStr;
+      itemStr = intervalStr + timerStr,
+      periodObj = {
+        str: itemStr,
+        periodTimer: periodTimer
+      }
+
+
   if(isLastPeriodSameDateAddPeriod){
     listPer[0] = listPer[0]
-    listPer[0].periods.unshift(itemStr)
-    listPer[0].totalOfDay += periodTimer
+    listPer[0].periods.unshift(periodObj)
+    listPer[0].totalOfDay = totalTimeDay(listPer[0].periods)
   } else {
     //Case different days or this is the first adquisition
-    var newDayOnList = {};
+    var newDayOnList = {}
+
     newDayOnList.date = dmyFromDate(lcTimeStartDate);
-    newDayOnList.periods = [itemStr];
+    newDayOnList.periods = [periodObj];
     newDayOnList.totalOfDay = periodTimer;
     listPer.unshift(newDayOnList);
   }
@@ -238,132 +283,50 @@ const addToList = (params) => {
 
 }
 
+const erasePeriod = (params) => {
+  if(!isFinite(params.idDay) || !isFinite(params.idPeriod)) {
+    //Check that idDay and idPeriod are numbers
+    throw("No idDay or idPeriod specified on the erasePeriod ")
+  }
 
-const testAddPeriod = () => {
-  //Firt case test, we add to an empty list a period started in the
-  //same day
-  let listBef = [],
-      lcTimeStartStr = hmFromDate(new Date("12/10/2015 10:20")),
-      lcTimestopStr = hmFromDate(new Date("12/10/2015 10:20:04")),
-      intervalStr =  "10:20: 4sec",
-      listAft = [
-        {
-          date: dmyFromDate(new Date("12/10/2015 10:20")),
-          periods: [intervalStr],
-          totalOfDay: 4000,
-        }
-      ],
-      params1 = {
-        listPeriods: listBef,
-        localTimeStartInterval: new Date("12/10/2015 10:20:00"),
-        localcTimeStopInterval: new Date("12/10/2015 10:20:04"),
-        periodTimer: 4000
-      }
-  console.log("1 AddPeriod: Case add period to empty array");
-  expect(addToList(params1)).toEqual(listAft);
+  let listP = params.listPeriods || listPeriods, //ForTesting
+      idDay = Number(params.idDay),
+      idPeriod = Number(params.idPeriod)
 
-  //Case adding period to  empty array. Different hours
-  let listBef2 = [],
-      intervalStr2 =  "10:20-10:21: 4sec",
-      listAft2 = [
-        {
-          date: dmyFromDate(new Date("12/10/2015 10:20")),
-          periods: [intervalStr2],
-          totalOfDay: 4000,
-        }
-      ],
-      params2 = {
-        listPeriods: listBef2,
-        localTimeStartInterval: new Date("12/10/2015 10:20:00"),
-        localcTimeStopInterval: new Date("12/10/2015 10:21:04"),
-        periodTimer: 4000
-      }
-  console.log("2 AddPeriod: Case add period to empty array different hm");
-  expect(addToList(params2)).toEqual(listAft2);
+  if(idDay >= listP.length){
+    //Case idDay is invalid
+    throw(
+          "idDay is larger than the number of days recorded on the listP arr",
+          "idDay", idDay,
+          "list", listP
+        )
+  }
+  if(idPeriod >= listP[idDay].periods.length) {
+    throw(
+      "idPeriod is larger than the number of periods on the idDay day",
+      "idDay", idDay,
+      "idPeriod", idPeriod,
+      "list", listP
+    )
+  }
+  //From here on, should be clean cases
+  let erased = listP[idDay].periods.splice(idPeriod, 1)[0]
+  listP[idDay].totalOfDay -= erased.periodTimer
 
-  //Case adding period to non empty array. Same Day
-  let listBef3 = [
-        {
-          date: dmyFromDate(new Date("12/10/2015 9:20")),
-          periods: ["09:20-09:21: 4sec"],
-          totalOfDay: 4000,
-        }
-      ],
-      listAft3 = [
-        {
-          date: dmyFromDate(new Date("12/10/2015 9:20")),
-          periods: [
-                    "10:20-10:21: 4sec",
-                    "09:20-09:21: 4sec"
-                  ],
-          totalOfDay: 8000,
-        }
-      ],
-      params3 = {
-        listPeriods: listBef3,
-        localTimeStartInterval: new Date("12/10/2015 10:20:00"),
-        localcTimeStopInterval: new Date("12/10/2015 10:21:04"),
-        periodTimer: 4000
-      }
-  console.log("3 AddPeriod: Case add period to non empty list. Same Day");
-  expect(addToList(params3)).toEqual(listAft3);
-
-  //Case adding period to non empty array. Different Date
-  let listBef4 = [
-        {
-          date: dmyFromDate(new Date("12/10/2015 9:20")),
-          periods: ["09:20-09:21: 4sec"],
-          totalOfDay: 4000,
-        }
-      ],
-      listAft4 = [
-        {
-          date: dmyFromDate(new Date("12/11/2015 10:20")),
-          periods: ["10:20-10:21: 10sec"],
-          totalOfDay: 10000,
-        },
-        {
-          date: dmyFromDate(new Date("12/10/2015 9:20")),
-          periods: ["09:20-09:21: 4sec"],
-          totalOfDay: 4000,
-        }
-      ],
-      params4 = {
-        listPeriods: listBef4,
-        localTimeStartInterval: new Date("12/11/2015 10:20:00"),
-        localcTimeStopInterval: new Date("12/11/2015 10:21:04"),
-        periodTimer: 10000
-      }
-  console.log("4 AddPeriod: Case add period to non empty list. Different Day");
-  expect(addToList(params4)).toEqual(listAft4);
-
-  //Case adding period to empty array. Beg and End Period on different dates
-  let listBef5 = [],
-      listAft5 = [
-        {
-          date: dmyFromDate(new Date("12/14/2015 GMT-0800")),
-          periods: ["00:00: 5sec"],
-          totalOfDay: 5000,
-        },
-        {
-          date: dmyFromDate(new Date("12/13/2015 GMT-0800")),
-          periods: ["23:59: 59sec"],
-          totalOfDay: 59000,
-        }
-      ],
-      params5 = {
-        listPeriods: listBef5,
-        localTimeStartInterval: new Date("12/13/2015 23:59:00 GMT-0800"),
-        localcTimeStopInterval: new Date("12/14/2015 00:00:04 GMT-0800"),
-        periodTimer: 64000
-      }
-      console.log("5 AddPeriod: Case adding period to empty array."
-                  + "Beg and End Period on different dates");
-      expect(addToList(params5)).toEqual(listAft5);
+  if(params.testMode){
+    return {
+            list: listP,
+            erased: erased
+          }
+  } else {
+    return erased
+  }
 
 }
 
-function hmsFromTimer(timer) {
+
+
+const hmsFromTimer = (timer) => {
   if(isFinite(timer)){
     timer = (timer < 0) ? -timer : timer //Only pos Numbers.
     var totSeconds = timer/1000,
@@ -415,99 +378,19 @@ function hmsFromTimer(timer) {
 
 }
 
-function testHmsFromTimer() {
-  var timer1 = 1000, //1sec
-      expected1 = {
-        h: 0,
-        min: 0,
-        sec: 1,
-        hStr: "",
-        minStr: "",
-        secStr: "1sec",
-        hms: "1sec",
-        input: 1000,
-        HH: "00",
-        MM: "00",
-        SS: "01",
-        HMS: "00:00:01",
-        hm: "",
-        HM: "00:00",
-      },
-      timer2 = 4000000, //4000 sec-> 1h 6mon 40sec
-      expected2  = {
-        h: 1,
-        min: 6,
-        sec: 40,
-        hStr: "1h",
-        minStr: "6min",
-        secStr: "40sec",
-        hms: "1h 6min 40sec",
-        input: 4000000,
-        HH: "01",
-        MM: "06",
-        SS: "40",
-        HMS: "01:06:40",
-        hm: "1h 6min",
-        HM: "01:06",
-      },
-      timer3 = 100, //0.1 sec
-      expected3 = {
-        h: 0,
-        min: 0,
-        sec: 0,
-        hStr: "",
-        minStr: "",
-        secStr: "0sec",
-        hms: "0sec",
-        input: 100,
-        HH: "00",
-        MM: "00",
-        SS: "00",
-        HMS: "00:00:00",
-        hm: "",
-        HM: "00:00",
-      },
-      timer4 = "hola",
-      expected4 = {
-        error: "hola is not a number"
-      }
-      console.log(1, hmsFromTimer(timer1), expected1)
-      expect(hmsFromTimer(timer1)).toEqual(expected1)
-      console.log(2, hmsFromTimer(timer2), expected2)
-      expect(hmsFromTimer(timer2)).toEqual(expected2)
-      console.log(3, hmsFromTimer(timer3), expected3)
-      expect(hmsFromTimer(timer3)).toEqual(expected3)
-      console.log(4,  hmsFromTimer(timer4), expected4)
-      expect(hmsFromTimer(timer4)).toEqual(expected4)
 
-}
 
-const dmyFromDate = (date) => {
+const dmyFromDate = (date = new Date) => {
   return  date.getDate() + "-"
           + (date.getMonth() + 1) + "-"
           + date.getFullYear()
 }
 
-const testDmyFromDate = () => {
-  let date1 = new Date("12/10/2016"),
-      dmy1 = "10-12-2016"
 
-  expect(dmyFromDate(date1)).toEqual(dmy1);
 
-}
+const hmFromDate = (date = new Date) => {
 
-const tests = () => {
-  testHmsFromTimer()
-  testDmyFromDate()
-  testAddPeriod()
-  console.log("All Tests Passed!")
-}
-
-tests();
-
-function hmFromDate(date) {
-
-  var hours = date.getHours(),
+  let hours = date.getHours(),
       minutes = date.getMinutes(),
       hoursStr = (hours.toString().length <= 1) ?
                 "0" + hours
@@ -516,4 +399,18 @@ function hmFromDate(date) {
                 "0" + minutes
                 : minutes;
   return hoursStr + ":" + minutesStr;
+}
+
+const totalTimeDay = (periodsArr)  => {
+  return periodsArr
+        .reduce((total, period) => total + period.periodTimer, 0)
+}
+
+const totalTimeOfToday = (listP = listPeriods) => {
+  if(listP && listP[0]) {
+    if(listP[0].date === dmyFromDate(new Date)) {
+      return totalTimeDay(listP[0].periods)
+    }
+  }
+  return 0
 }
