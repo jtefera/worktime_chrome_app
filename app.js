@@ -2,7 +2,7 @@ var hoursSpan = document.getElementById("hours"),
     minutesSpan = document.getElementById("minutes"),
     secondsSpan = document.getElementById("seconds"),
     startStopBtn = document.getElementById("startStop"),
-    restartBtn = document.getElementById("restart"),
+//  restartBtn = document.getElementById("restart"),
     clearAllBtn = document.getElementById("clearAll"),
     clearCanceledBtn = document.getElementById("clearCanceled"),
     clearComfirmedBtn = document.getElementById("clearComfirmed"),
@@ -18,17 +18,22 @@ var hoursSpan = document.getElementById("hours"),
     localTimeStartInterval,
     totalTime = 0,
     totalTimeBeforeStart = 0,
-    listPeriods = []
+    listPeriods = [];
 
 //Retrieving list from previous sessions
 
 const saveListPeriodsToLocal = (callback) => {
+  //Save current state of the listPeriods variable into the local
+  //storage from chrome. With this, the list can be saved for several days
+  //even after the computer has been restarted
   chrome.storage.local.set({
     'list': listPeriods
   }, callback)
 }
 
 const setListPeriodsFromLocal = (callback) => {
+  //Set the listPeriods variable from the copy in the local
+  //storage. Used for initialize from previous session
   chrome.storage.local.get('list', function(item) {
     listPeriods = item.list
     if(callback) callback()
@@ -36,6 +41,7 @@ const setListPeriodsFromLocal = (callback) => {
 }
 
 const initApp = () => {
+  //Set listPeriods var from the values saved in the previous session
   setListPeriodsFromLocal(() => {
     if(listPeriods.length){
       renderListPeriods()
@@ -50,6 +56,7 @@ const initApp = () => {
 initApp()
 
 startStopBtn.addEventListener("click", function() {
+  //Main button. Controls the start and the stom of the timer
   var action = startStopBtn.textContent.trim()
   if(action === "Start!") {
     start()
@@ -59,6 +66,8 @@ startStopBtn.addEventListener("click", function() {
     throw("Err: startStopBtn is not 'Start!' or 'Stop!' but " + action)
   }
 })
+
+/*
 
 restartBtn.addEventListener("click", function() {
   totalTime -= timer
@@ -70,13 +79,16 @@ restartBtn.addEventListener("click", function() {
     startStopBtn.textContent = "Start!"
     clearInterval(startInterval)
   }
-})
+})*/
 
 clearAllBtn.addEventListener("click", function() {
+  //Clear btn. After pressing this button,
+  //the comfirm panel appears
   clearComfirmBoxDiv.style.display = "block"
 })
 
 clearCanceledBtn.addEventListener("click", function() {
+  //Cancel clear btn from the comfirm box
   clearComfirmBoxDiv.style.display = "none";
 })
 
@@ -87,7 +99,7 @@ clearComfirmedBtn.addEventListener("click", function() {
   timer = 0;
   totalTime = 0;
   renderFromTimer(timer);
-  renderTotalTime(timer);
+  renderTotalTime(totalTime);
   //Stop all process
   if(startInterval){
     startStopBtn.textContent = "Start!"
@@ -98,17 +110,27 @@ clearComfirmedBtn.addEventListener("click", function() {
   renderListPeriods();
 })
 
-function start() {
-  localTimeStartInterval = new Date();
-  startStopBtn.textContent = "Stop!";
-  timeStartInterval = Date.now();
-  timerBeforeStart = timer;
+const start = () => {
+  //After start button pressed
 
-  if(listPeriods[0] && listPeriods[0].date === dmyFromDate(localTimeStartInterval)) {
-    totalTimeBeforeStart = listPeriods[0].totalOfDay
-  } else {
-    totalTimeBeforeStart = 0;
-  }
+  //Time of interval start
+  localTimeStartInterval = new Date();
+  //change start stop button text to stop
+  startStopBtn.textContent = "Stop!";
+
+  //date now gives the milliseconds from 1970
+  timeStartInterval = Date.now()
+  //Probably useless as timer at this moment should be 0
+  //as there is no pause button(only stop). Useful if you want to implement
+  //a pause botton
+  timerBeforeStart = timer
+
+  //0 if this is the first period of the day. If not,
+  //it calculates the sum of all periods of the day
+  totalTimeBeforeStart = totalTimeOfToday(listPeriods)
+
+  //Set interval that updates every second the visualization of the timer
+  //and the timers itself
   startInterval = setInterval(function() {
     timeNow = Date.now();
     timer = timerBeforeStart + timeNow - timeStartInterval;
@@ -118,7 +140,7 @@ function start() {
   }, 1000);
 }
 
-function stop() {
+const stop = () => {
 
   startStopBtn.textContent = "Start!"
   clearInterval(startInterval);
@@ -253,11 +275,14 @@ const addToList = (params) => {
 
 
   if(isLastPeriodSameDateAddPeriod){
-    listPer[0] = listPer[0]
+    //Case last period was done in the same day than this one
+    //No need to create new Object
+    //add new period to periods array and update the total time
     listPer[0].periods.unshift(periodObj)
     listPer[0].totalOfDay = totalTimeDay(listPer[0].periods)
   } else {
     //Case different days or this is the first adquisition
+    //Create new list for the day and add it to the listperiods array
     var newDayOnList = {}
 
     newDayOnList.date = dmyFromDate(lcTimeStartDate);
@@ -267,6 +292,10 @@ const addToList = (params) => {
   }
 
   if(!isBegAndEndPeriodSameDay) {
+    //Case the begining of the period is in a different day than the End
+    //of the period
+    //Subdivide the period in the day division time (23:59-00:00)
+    //adding the first day
     let nextDayStart = lcTimeStartDate
     nextDayStart.setDate(lcTimeStartDate.getDate() + 1)
     nextDayStart.setHours(0)
@@ -284,6 +313,7 @@ const addToList = (params) => {
 }
 
 const erasePeriod = (params) => {
+  //erase specified period from a day
   if(!isFinite(params.idDay) || !isFinite(params.idPeriod)) {
     //Check that idDay and idPeriod are numbers
     throw("No idDay or idPeriod specified on the erasePeriod ")
