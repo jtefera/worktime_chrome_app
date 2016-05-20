@@ -2,6 +2,8 @@ var hoursSpan = document.getElementById("hours"),
     minutesSpan = document.getElementById("minutes"),
     secondsSpan = document.getElementById("seconds"),
     startStopBtn = document.getElementById("startStop"),
+    salaryPeriodSpan = document.getElementById("salaryPeriod"),
+    salaryTotalSpan = document.getElementById("salaryTotal"),
 //  restartBtn = document.getElementById("restart"),
     clearAllBtn = document.getElementById("clearAll"),
     clearCanceledBtn = document.getElementById("clearCanceled"),
@@ -9,6 +11,7 @@ var hoursSpan = document.getElementById("hours"),
     clearComfirmBoxDiv = document.getElementById("clearComfirmBox"),
     listTimesUl = document.getElementById("listTimes"),
     totalTimeH4 = document.getElementById("totalTime"),
+    dolPerHourIn = document.getElementById("dolPerHour"),
     timer = 0,
     startInterval,
     timeNow = 0,
@@ -18,7 +21,10 @@ var hoursSpan = document.getElementById("hours"),
     localTimeStartInterval,
     totalTime = 0,
     totalTimeBeforeStart = 0,
-    listPeriods = [];
+    listPeriods = [],
+    salaryRate = 15;
+
+const NUMBER_DECIMALS_SALARY = 2
 
 //Retrieving list from previous sessions
 
@@ -34,7 +40,7 @@ const saveListPeriodsToLocal = (callback) => {
 const setListPeriodsFromLocal = (callback) => {
   //Set the listPeriods variable from the copy in the local
   //storage. Used for initialize from previous session
-  chrome.storage.local.get('list', function(item) {
+  chrome.storage.local.get('list', (item) => {
     listPeriods = item.list
     if(callback) callback()
   })
@@ -49,13 +55,15 @@ const initApp = () => {
         totalTime = totalTimeDay(listPeriods[0].periods)
       }
       renderTotalTime(totalTime)
+      renderSalaryPeriod()
+      renderSalaryTotalOfDay()
     }
   })
 }
 //Set initial list view
 initApp()
 
-startStopBtn.addEventListener("click", function() {
+startStopBtn.addEventListener("click", () => {
   //Main button. Controls the start and the stom of the timer
   var action = startStopBtn.textContent.trim()
   if(action === "Start!") {
@@ -81,18 +89,18 @@ restartBtn.addEventListener("click", function() {
   }
 })*/
 
-clearAllBtn.addEventListener("click", function() {
+clearAllBtn.addEventListener("click", () => {
   //Clear btn. After pressing this button,
   //the comfirm panel appears
   clearComfirmBoxDiv.style.display = "block"
 })
 
-clearCanceledBtn.addEventListener("click", function() {
+clearCanceledBtn.addEventListener("click", () => {
   //Cancel clear btn from the comfirm box
   clearComfirmBoxDiv.style.display = "none";
 })
 
-clearComfirmedBtn.addEventListener("click", function() {
+clearComfirmedBtn.addEventListener("click", () => {
   //Hide comfirm box
   clearComfirmBoxDiv.style.display = "none";
   //Set timers to 0
@@ -108,6 +116,15 @@ clearComfirmedBtn.addEventListener("click", function() {
   //Clear all the list
   listPeriods = []
   renderListPeriods();
+})
+
+dolPerHourIn.addEventListener("change", (e) => {
+  salaryRate = Number(e.target.value)
+  renderFromTimer(timer)
+  renderTotalTime(totalTime)
+  renderSalaryPeriod()
+  renderSalaryTotalOfDay()
+  renderListPeriods()
 })
 
 const start = () => {
@@ -131,62 +148,84 @@ const start = () => {
 
   //Set interval that updates every second the visualization of the timer
   //and the timers itself
-  startInterval = setInterval(function() {
-    timeNow = Date.now();
-    timer = timerBeforeStart + timeNow - timeStartInterval;
-    totalTime = totalTimeBeforeStart + timeNow - timeStartInterval;
-    renderFromTimer(timer);
-    renderTotalTime(totalTime);
+  startInterval = setInterval(() => {
+    timeNow = Date.now()
+    timer = timerBeforeStart + timeNow - timeStartInterval
+    totalTime = totalTimeBeforeStart + timeNow - timeStartInterval
+    renderFromTimer(timer)
+    renderTotalTime(totalTime)
+    renderSalaryPeriod()
+    renderSalaryTotalOfDay()
   }, 1000);
 }
 
 const stop = () => {
+  //When stop button is pressed.
+  //Restarts the timer, adds into the listPeriods arr the actual period
+  //and rerenders everypart
 
+  //Change startStopBtn to start mode
   startStopBtn.textContent = "Start!"
-  clearInterval(startInterval);
-  var newPeriodLi = document.createElement("li"),
+
+  //clear the interval that updated the timers every second
+  clearInterval(startInterval)
+
+  let newPeriodLi = document.createElement("li"),
       hmLTStart = hmFromDate(localTimeStartInterval),
       hmLTStop = hmFromDate(new Date()),
       intPeriod = (hmLTStop === hmLTStart) ?
                  hmLTStart + ": "
                  : hmLTStart + "-" + hmLTStop + ": ";
-  ;
+  //Add to the listPeriods
   addToList({
     listPeriods,
     localTimeStartInterval,
     periodTimer: timer})
   //Save to local
   saveListPeriodsToLocal()
+  //Rerenders
   renderListPeriods();
   timer = 0;
   renderFromTimer(timer);
 
 }
 
-function renderFromTimer(timer = timer) {
+const renderFromTimer = (timer = timer) => {
+  //Displays on the app the timer formatted into h:m:s
   var HMSObj = hmsFromTimer(timer);
   hoursSpan.textContent = HMSObj.HH;
   minutesSpan.textContent = HMSObj.MM;
   secondsSpan.textContent = HMSObj.SS;
 }
 
-function renderListPeriods() {
-  //Reset the list.
-  //Erase all the childs. This could be done by setting
-  //listTimesUl.innerHTML = ""
-  //But this method is faster.
-  //See: http://stackoverflow.com/questions/3955229/remove-all-child-elements-of-a-dom-node-in-javascript
+const renderListPeriods = () => {
+  //Renders the listPeriods arr into the display as li elements
+
   while(listTimesUl.firstChild) {
+    //Reset the list.
+    //Erase all the childs. This could be done by setting
+    //listTimesUl.innerHTML = ""
+    //But this method is faster.
+    //See: http://stackoverflow.com/questions/3955229/remove-all-child-elements-of-a-dom-node-in-javascript
     listTimesUl.removeChild(listTimesUl.firstChild);
   }
-  listPeriods.map(function(dayObj, dayId) {
+
+
+  listPeriods.map((dayObj, dayId) => {
+    //Display every day object formed by date, periods arr and total timer
+    //of the day
+
     //Date Part
-    var today = new Date(),
+    let today = new Date(),
         dateLi = document.createElement("li"),
         boldDay = document.createElement("b");
-    boldDay.textContent = (dayObj.date === dmyFromDate(today)) ?
+    boldDay.textContent = ((dayObj.date === dmyFromDate(today)) ?
                           "Today"
-                          : dayObj.date;
+                          : dayObj.date)
+                          + ". "
+                          + ((salaryRate * totalTimeDay(dayObj.periods)) / (1000 * 3600))
+                          .toFixed(NUMBER_DECIMALS_SALARY)
+                          + "$";
     dateLi.appendChild(boldDay);
     listTimesUl.appendChild(dateLi);
 
@@ -197,7 +236,7 @@ function renderListPeriods() {
     listTimesUl.appendChild(totalOfDayLi);
 
     //Periods Parts
-    dayObj.periods.map(function(period, periodId) {
+    dayObj.periods.map((period, periodId) => {
       var newPeriodLi = document.createElement("li"),
           newEraseLink = document.createElement("a"),
           paramEraseFunc = {
@@ -205,7 +244,9 @@ function renderListPeriods() {
             idPeriod: periodId
           }
 
-      newPeriodLi.textContent = period.str
+      newPeriodLi.textContent = period.str + ". "
+          + (salaryRate * period.periodTimer / ( 1000 * 60 * 60))
+          .toFixed(NUMBER_DECIMALS_SALARY) + "$. "
 
       newEraseLink.textContent = "Erase"
       newEraseLink.setAttribute('href', '#')
@@ -227,7 +268,18 @@ function renderListPeriods() {
   });
 }
 
-function renderTotalTime(totalTime) {
+const renderSalaryPeriod = () => {
+  salaryPeriodSpan.textContent = (salaryRate * timer / (1000 * 60 * 60))
+                                  .toFixed(NUMBER_DECIMALS_SALARY)
+}
+
+const renderSalaryTotalOfDay = () => {
+  salaryTotalSpan.textContent =
+        (salaryRate * totalTimeOfToday(listPeriods) / (1000 * 60 * 60))
+        .toFixed(NUMBER_DECIMALS_SALARY)
+}
+
+const renderTotalTime = (totalTime) => {
   totalTimeH4.textContent = "Total Time of Day: " + hmsFromTimer(totalTime).hms;
 }
 
