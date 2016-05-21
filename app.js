@@ -1,7 +1,4 @@
-var hoursSpan = document.getElementById("hours"),
-    minutesSpan = document.getElementById("minutes"),
-    secondsSpan = document.getElementById("seconds"),
-    startStopBtn = document.getElementById("startStop"),
+var startStopBtn = document.getElementById("startStop"),
     salaryPeriodSpan = document.getElementById("salaryPeriod"),
     salaryTotalSpan = document.getElementById("salaryTotal"),
 //  restartBtn = document.getElementById("restart"),
@@ -12,6 +9,9 @@ var hoursSpan = document.getElementById("hours"),
     listTimesUl = document.getElementById("listTimes"),
     totalTimeH4 = document.getElementById("totalTime"),
     dolPerHourIn = document.getElementById("dolPerHour"),
+    changeTimerFormatA = document.getElementById("changeTimerFormat"),
+    timerSpan = document.getElementById("timer"),
+    timerFormat = "HMS",
     timer = 0,
     startInterval,
     timeNow = 0,
@@ -24,7 +24,8 @@ var hoursSpan = document.getElementById("hours"),
     listPeriods = [],
     salaryRate = 15;
 
-const NUMBER_DECIMALS_SALARY = 2
+const NUMBER_DECIMALS_SALARY = 2,
+      NUMBER_DECIMALS_HTIMER = 2
 
 //Retrieving list from previous sessions
 
@@ -127,6 +128,21 @@ dolPerHourIn.addEventListener("change", (e) => {
   renderListPeriods()
 })
 
+changeTimerFormatA.addEventListener("click", (e) => {
+  e.preventDefault()
+  if(timerFormat === "HMS") {
+    timerFormat = "H"
+    changeTimerFormatA.textContent ="Change Timer format to HH:MM:SS"
+  } else {
+    timerFormat = "HMS"
+    changeTimerFormatA.textContent ="Change Timer format to Hours"
+  }
+  renderListPeriods()
+  renderTotalTime(totalTime)
+  renderFromTimer(timer)
+
+})
+
 const start = () => {
   //After start button pressed
 
@@ -192,10 +208,12 @@ const stop = () => {
 
 const renderFromTimer = (timer = timer) => {
   //Displays on the app the timer formatted into h:m:s
-  var HMSObj = hmsFromTimer(timer);
-  hoursSpan.textContent = HMSObj.HH;
-  minutesSpan.textContent = HMSObj.MM;
-  secondsSpan.textContent = HMSObj.SS;
+  let HMSObj = hmsFromTimer(timer),
+      timerStr = (timerFormat === "HMS")
+                  ? HMSObj.HMS
+                  : (timer / (1000 * 60 * 60)).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+  timerSpan.textContent = timerStr
+
 }
 
 const renderListPeriods = () => {
@@ -230,10 +248,13 @@ const renderListPeriods = () => {
     listTimesUl.appendChild(dateLi);
 
     //Total of the Day Part
-    var totalOfDayLi = document.createElement("li");
+    let totalOfDayLi = document.createElement("li"),
+        totalOfDayStr = (timerFormat === "HMS")
+                        ? hmsFromTimer(dayObj.totalOfDay).hms
+                        : (dayObj.totalOfDay / (1000 * 60 * 60)).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
     totalOfDayLi.textContent = "Total time: "
-                              + hmsFromTimer(dayObj.totalOfDay).hms;
-    listTimesUl.appendChild(totalOfDayLi);
+                              + totalOfDayStr
+    listTimesUl.appendChild(totalOfDayLi)
 
     //Periods Parts
     dayObj.periods.map((period, periodId) => {
@@ -243,8 +264,11 @@ const renderListPeriods = () => {
             idDay: dayId,
             idPeriod: periodId
           }
-
-      newPeriodLi.textContent = period.str + ". "
+      console.log(period)
+      let timerPeriodText = (timerFormat === "HMS") ?
+                            period.strHMS
+                            : period.strH
+      newPeriodLi.textContent = timerPeriodText + ". "
           + (salaryRate * period.periodTimer / ( 1000 * 60 * 60))
           .toFixed(NUMBER_DECIMALS_SALARY) + "$. "
 
@@ -280,7 +304,11 @@ const renderSalaryTotalOfDay = () => {
 }
 
 const renderTotalTime = (totalTime) => {
-  totalTimeH4.textContent = "Total Time of Day: " + hmsFromTimer(totalTime).hms;
+  let totalTimerStr = (timerFormat === "HMS")
+                      ? hmsFromTimer(totalTime).hms
+                      : (totalTime / (1000 * 60 * 60)).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+
+  totalTimeH4.textContent = "Total Time of Day: " + totalTimerStr
 }
 
 const addToList = (params) => {
@@ -318,10 +346,13 @@ const addToList = (params) => {
       intervalStr = (lcTimeStartStr === lcTimestopStr)?
                     lcTimeStartStr + ": "
                     : lcTimeStartStr + "-" + lcTimestopStr + ": ",
-      timerStr = hmsFromTimer(periodTimer).hms,
-      itemStr = intervalStr + timerStr,
+      timerStrHMS = hmsFromTimer(periodTimer).hms,
+      timerStrH = (periodTimer / (1000 * 60 * 60) ).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+      itemStrHMS = intervalStr + timerStrHMS,
+      itemStrH = intervalStr + timerStrH,
       periodObj = {
-        str: itemStr,
+        strHMS: itemStrHMS,
+        strH: itemStrH,
         periodTimer: periodTimer
       }
 
@@ -363,6 +394,25 @@ const addToList = (params) => {
   return listPer;
 
 }
+
+/*const transformAllPerids = () => {
+  listPeriods.map(dayObj => {
+    dayObj.periods.map(periodObj => {
+      if(periodObj.str){
+        let intervalStr = periodObj.str.split(":")[0],
+            timerStrHMS = hmsFromTimer(periodObj.periodTimer).hms,
+            timerStrH = (periodObj.periodTimer / (1000 * 60 * 60) )
+                        .toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+        periodObj.strH = intervalStr + timerStrH
+        periodObj.strHMS = intervalStr + timerStrHMS
+        delete periodObj.str
+      }
+    })
+  })
+  saveListPeriodsToLocal()
+  renderListPeriods()
+
+}*/
 
 const erasePeriod = (params) => {
   //erase specified period from a day
