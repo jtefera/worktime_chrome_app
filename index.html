@@ -1,6 +1,11 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <!-- Normalize -->
+    <link
+      href="css/normalize.css"
+      rel="stylesheet">
+
     <!-- Bootstrap + jQuery -->
     <link
       href="css/bootstrap.min.css"
@@ -15,9 +20,21 @@
       src="js/bootstrap.min.js"
     > </script>
 
+    <!-- Font Awesome -->
+    <link
+      href="css/font-awesome.min.css"
+      rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link
+      href='https://fonts.googleapis.com/css?family=Roboto:400,700|Oswald:400,700'
+      rel='stylesheet'
+      type='text/css'>
+
     <style>
       body {
         -webkit-user-select: text;
+        font-family: 'Roboto';
       }
       html, body {
           overflow-y: visible;
@@ -38,49 +55,75 @@
 
   </head>
   <body>
-    <div id="clearComfirmBox">
-      <p>
-        Hey! If you click the clear button all the data will be lost.
-        Press cancel if you don't want that!
-      </p>
-      <button id="clearCanceled">Cancel</button>
-      <button id="clearComfirmed">Clear</button>
-    </div>
-    <a href="#" id="changeTimerFormat">Change Timer format to Hours</a>
-    <h2 id="timerSalary">
-        <span id="timer">
-          00:00:00
-        </span>
-         >
-        <span id="salaryPeriod">
-          0
-        </span> $
-    </h2>
-    <div id="buttons">
-      <button id="startStop">
-        Start!
-      </button>
-      <!--<button id="restart">
-        Restart
-      </button>-->
-      <button id="clearAll">
-        Clear All
-      </button>
-      <input
-        id="dolPerHour"
-        type="number"
-        size="3"
-        value="15"
-      >
-      </input> $/hour
-    </div>
-    <h4>
-      <span id="totalTime"></span>
-      <span id="salaryTotal"></span>$
-    </h4>
-    <ul id="listTimes">
+    <div class="container">
+      <div class="row">
+        <div id="app" class="container col-sm-4 col-sm-offset-4 col-xs-10 col-xs-offset-1">
+          <div id="clearComfirmBox">
+            <p>
+              Hey! If you click the clear button all the data will be lost.
+              Press cancel if you don't want that!
+            </p>
+            <button id="clearCanceled" class="btn btn-success">Cancel</button>
+            <button id="clearComfirmed" class="btn btn-danger">Clear</button>
+          </div>
+          <a href="#" id="changeTimerFormat">Change Timer format to Hours</a>
+          <h3 id="timerSalary" class="row">
+              <div class="col-sm-5 col-xs-5">
+                <span id="timer">
+                  00:00:00
+                </span>
+              </div>
+              <div class="col-sm-1 col-xs-1">
+                <i class="fa fa-angle-right"></i>
+              </div>
+              <div class="col-sm-5 col-xs-5">
+                <span id="salaryPeriod">
+                  0
+                </span> $
+              </div>
+          </h3>
+          <div id="buttons" class="row">
+            <div class="col-sm-6 col-xs-12">
+              <button id="startStop" class="btn btn-success btn-block">
+                Start!
+              </button>
+            </div>
+            <!--<button id="restart">
+              Restart
+            </button>-->
+            <div class="col-sm-6 col-xs-12">
+              <button id="clearAll" class="btn btn-warning btn-block">
+                Clear All
+              </button>
+            </div>
+            <div class="row col-sm-10 col-xs-10 col-sm-offset-1 col-xs-offset-1">
+              <div class="col-sm-12 col-xs-12">
+                <div class="input-group">
+                  <div class="input-group-addon">Salary</div>
+                  <input
+                    id="dolPerHour"
+                    type="number"
+                    size="3"
+                    value="15"
+                    class="form-control"
+                  >
+                  </input>
+                  <div class="input-group-addon">$/h</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <h4>
+            <span id="totalTime"></span>
+            <span id="salaryTotal"></span>$
+          </h4>
+          <ul id="listTimes">
 
-    </ul>
+          </ul>
+        </div>
+      </div>
+    </div>
+
 
     <script
       type="text/javascript"

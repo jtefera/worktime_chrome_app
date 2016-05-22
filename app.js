@@ -51,13 +51,14 @@ const initApp = () => {
   //Set listPeriods var from the values saved in the previous session
   setListPeriodsFromLocal(() => {
     if(listPeriods.length){
-      renderListPeriods()
+      //*renderListPeriods()
       if(listPeriods[0].date === dmyFromDate(new Date())){
         totalTime = totalTimeDay(listPeriods[0].periods)
       }
-      renderTotalTime(totalTime)
-      renderSalaryPeriod()
-      renderSalaryTotalOfDay()
+      //*renderTotalTime(totalTime)
+      //*renderSalaryPeriod()
+      //*renderSalaryTotalOfDay()
+      render()
     }
   })
 }
@@ -107,8 +108,8 @@ clearComfirmedBtn.addEventListener("click", () => {
   //Set timers to 0
   timer = 0;
   totalTime = 0;
-  renderFromTimer(timer);
-  renderTotalTime(totalTime);
+  //*renderFromTimer(timer);
+  //*renderTotalTime(totalTime);
   //Stop all process
   if(startInterval){
     startStopBtn.textContent = "Start!"
@@ -116,16 +117,18 @@ clearComfirmedBtn.addEventListener("click", () => {
   }
   //Clear all the list
   listPeriods = []
-  renderListPeriods();
+  //*renderListPeriods();
+  render()
 })
 
 dolPerHourIn.addEventListener("change", (e) => {
   salaryRate = Number(e.target.value)
-  renderFromTimer(timer)
-  renderTotalTime(totalTime)
-  renderSalaryPeriod()
-  renderSalaryTotalOfDay()
-  renderListPeriods()
+  //*renderFromTimer(timer)
+  //*renderTotalTime(totalTime)
+  //*renderSalaryPeriod()
+  //*renderSalaryTotalOfDay()
+  //*renderListPeriods()
+  render()
 })
 
 changeTimerFormatA.addEventListener("click", (e) => {
@@ -137,9 +140,10 @@ changeTimerFormatA.addEventListener("click", (e) => {
     timerFormat = "HMS"
     changeTimerFormatA.textContent ="Change Timer format to Hours"
   }
-  renderListPeriods()
-  renderTotalTime(totalTime)
-  renderFromTimer(timer)
+  //*renderListPeriods()
+  //*renderTotalTime(totalTime)
+  //*renderFromTimer(timer)
+  render()
 
 })
 
@@ -168,10 +172,11 @@ const start = () => {
     timeNow = Date.now()
     timer = timerBeforeStart + timeNow - timeStartInterval
     totalTime = totalTimeBeforeStart + timeNow - timeStartInterval
-    renderFromTimer(timer)
-    renderTotalTime(totalTime)
-    renderSalaryPeriod()
-    renderSalaryTotalOfDay()
+    //*renderFromTimer(timer)
+    //*renderTotalTime(totalTime)
+    //*renderSalaryPeriod()
+    //*renderSalaryTotalOfDay()
+    render()
   }, 1000);
 }
 
@@ -200,10 +205,19 @@ const stop = () => {
   //Save to local
   saveListPeriodsToLocal()
   //Rerenders
-  renderListPeriods();
+  //*renderListPeriods();
   timer = 0;
-  renderFromTimer(timer);
+  //*renderFromTimer(timer);
+  render()
 
+}
+
+const render = () => {
+  renderFromTimer(timer)
+  renderListPeriods()
+  renderTotalTime(totalTime)
+  renderSalaryPeriod()
+  renderSalaryTotalOfDay()
 }
 
 const renderFromTimer = (timer = timer) => {
@@ -278,9 +292,10 @@ const renderListPeriods = () => {
         e.preventDefault()
         erasePeriod(paramEraseFunc)
         saveListPeriodsToLocal(() => {
-          renderListPeriods()
+          //*renderListPeriods()
           totalTime = totalTimeOfToday(listPeriods)
-          renderTotalTime(totalTime)
+          //*renderTotalTime(totalTime)
+          render()
         })
         //renderListPeriods()
       })
