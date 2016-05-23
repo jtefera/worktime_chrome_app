@@ -25,7 +25,8 @@ var startStopBtn = document.getElementById("startStop"),
     salaryRate = 15;
 
 const NUMBER_DECIMALS_SALARY = 2,
-      NUMBER_DECIMALS_HTIMER = 2
+      NUMBER_DECIMALS_HTIMER = 2,
+      MS_TO_H = 1 / (1000 * 60 * 60)
 
 //Retrieving list from previous sessions
 
@@ -42,15 +43,17 @@ const setListPeriodsFromLocal = (callback) => {
   //Set the listPeriods variable from the copy in the local
   //storage. Used for initialize from previous session
   chrome.storage.local.get('list', (item) => {
-    listPeriods = item.list
-    if(callback) callback()
+    if(item.list){
+      listPeriods = item.list
+      if(callback) callback()
+    }
   })
 }
 
 const initApp = () => {
   //Set listPeriods var from the values saved in the previous session
   setListPeriodsFromLocal(() => {
-    if(listPeriods.length){
+    if(listPeriods && listPeriods.length){
       //*renderListPeriods()
       if(listPeriods[0].date === dmyFromDate(new Date())){
         totalTime = totalTimeDay(listPeriods[0].periods)
@@ -69,8 +72,10 @@ startStopBtn.addEventListener("click", () => {
   //Main button. Controls the start and the stom of the timer
   var action = startStopBtn.textContent.trim()
   if(action === "Start!") {
+    startStopBtn.setAttribute("class", "btn btn-warning btn-block")
     start()
   } else if(action === "Stop!") {
+    startStopBtn.setAttribute("class", "btn btn-success btn-block")
     stop()
   } else {
     throw("Err: startStopBtn is not 'Start!' or 'Stop!' but " + action)
@@ -225,7 +230,7 @@ const renderFromTimer = (timer = timer) => {
   let HMSObj = hmsFromTimer(timer),
       timerStr = (timerFormat === "HMS")
                   ? HMSObj.HMS
-                  : (timer / (1000 * 60 * 60)).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+                  : (timer * MS_TO_H).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
   timerSpan.textContent = timerStr
 
 }
@@ -249,26 +254,33 @@ const renderListPeriods = () => {
 
     //Date Part
     let today = new Date(),
-        dateLi = document.createElement("li"),
-        boldDay = document.createElement("b");
-    boldDay.textContent = ((dayObj.date === dmyFromDate(today)) ?
+        dateLi = document.createElement("li")
+
+    dateLi.textContent = ((dayObj.date === dmyFromDate(today)) ?
                           "Today"
                           : dayObj.date)
-                          + ". "
-                          + ((salaryRate * totalTimeDay(dayObj.periods)) / (1000 * 3600))
-                          .toFixed(NUMBER_DECIMALS_SALARY)
-                          + "$";
-    dateLi.appendChild(boldDay);
-    listTimesUl.appendChild(dateLi);
+    dateLi.setAttribute("class", "li-date li-header")
+    listTimesUl.appendChild(dateLi)
 
     //Total of the Day Part
     let totalOfDayLi = document.createElement("li"),
         totalOfDayStr = (timerFormat === "HMS")
-                        ? hmsFromTimer(dayObj.totalOfDay).hms
-                        : (dayObj.totalOfDay / (1000 * 60 * 60)).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+                ? hmsFromTimer(dayObj.totalOfDay).hms
+                : msToHFixed(dayObj.totalOfDay) + "h"
+
     totalOfDayLi.textContent = "Total time: "
                               + totalOfDayStr
+    totalOfDayLi.setAttribute("class", "li-totalOfDay li-header")
     listTimesUl.appendChild(totalOfDayLi)
+
+    //Total earned Part
+    let totalEarnedLi = document.createElement("li")
+    totalEarnedLi.textContent = "Total Earned: "
+                  + (salaryRate * totalTimeDay(dayObj.periods) * MS_TO_H)
+                  .toFixed(NUMBER_DECIMALS_SALARY)
+                  + "$"
+    totalEarnedLi.setAttribute("class", "li-totalEarned li-header")
+    listTimesUl.appendChild(totalEarnedLi)
 
     //Periods Parts
     dayObj.periods.map((period, periodId) => {
@@ -278,12 +290,12 @@ const renderListPeriods = () => {
             idDay: dayId,
             idPeriod: periodId
           }
-      console.log(period)
+      newPeriodLi.setAttribute("class", "li-listperiods")
       let timerPeriodText = (timerFormat === "HMS") ?
                             period.strHMS
                             : period.strH
       newPeriodLi.textContent = timerPeriodText + ". "
-          + (salaryRate * period.periodTimer / ( 1000 * 60 * 60))
+          + (salaryRate * period.periodTimer * MS_TO_H)
           .toFixed(NUMBER_DECIMALS_SALARY) + "$. "
 
       newEraseLink.textContent = "Erase"
@@ -308,20 +320,20 @@ const renderListPeriods = () => {
 }
 
 const renderSalaryPeriod = () => {
-  salaryPeriodSpan.textContent = (salaryRate * timer / (1000 * 60 * 60))
+  salaryPeriodSpan.textContent = (salaryRate * timer * MS_TO_H)
                                   .toFixed(NUMBER_DECIMALS_SALARY)
 }
 
 const renderSalaryTotalOfDay = () => {
   salaryTotalSpan.textContent =
-        (salaryRate * totalTimeOfToday(listPeriods) / (1000 * 60 * 60))
+        (salaryRate * totalTimeOfToday(listPeriods) * MS_TO_H)
         .toFixed(NUMBER_DECIMALS_SALARY)
 }
 
 const renderTotalTime = (totalTime) => {
   let totalTimerStr = (timerFormat === "HMS")
                       ? hmsFromTimer(totalTime).hms
-                      : (totalTime / (1000 * 60 * 60)).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+                      : msToHFixed(totalTime) + "h"
 
   totalTimeH4.textContent = "Total Time of Day: " + totalTimerStr
 }
@@ -362,7 +374,7 @@ const addToList = (params) => {
                     lcTimeStartStr + ": "
                     : lcTimeStartStr + "-" + lcTimestopStr + ": ",
       timerStrHMS = hmsFromTimer(periodTimer).hms,
-      timerStrH = (periodTimer / (1000 * 60 * 60) ).toFixed(NUMBER_DECIMALS_HTIMER) + "h"
+      timerStrH = msToHFixed(periodTimer) + "h"
       itemStrHMS = intervalStr + timerStrHMS,
       itemStrH = intervalStr + timerStrH,
       periodObj = {
@@ -499,6 +511,7 @@ const hmsFromTimer = (timer) => {
                   : seconds,
         HMS = HH + ":" + MM + ":" + SS,
         HM = HH + ":" + MM,
+        H = (timer * MS_TO_H).toFixed(NUMBER_DECIMALS_HTIMER) + "h",
         formats = {
           h: hours,
           min: minutes,
@@ -509,6 +522,7 @@ const hmsFromTimer = (timer) => {
           HH: HH,
           MM: MM,
           SS: SS,
+          H: H,
           hms: hms,
           HMS: HMS,
           hm: hm,
@@ -548,6 +562,9 @@ const hmFromDate = (date = new Date) => {
   return hoursStr + ":" + minutesStr;
 }
 
+const msToHFixed = (timeMs, fix = NUMBER_DECIMALS_HTIMER) => {
+  return (timeMs * MS_TO_H).toFixed(fix)
+}
 const totalTimeDay = (periodsArr)  => {
   return periodsArr
         .reduce((total, period) => total + period.periodTimer, 0)

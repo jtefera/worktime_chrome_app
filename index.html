@@ -3,7 +3,7 @@
     <meta charset="utf-8">
     <!-- Normalize -->
     <link
-      href="css/normalize.css"
+      href="css/reset.css"
       rel="stylesheet">
 
     <!-- Bootstrap + jQuery -->
@@ -38,6 +38,7 @@
       }
       html, body {
           overflow-y: visible;
+          text-align: center;
       }
       #clearComfirmBox {
         position: absolute;
@@ -49,6 +50,21 @@
       }
       #timerH {
         display: none;
+      }
+      #listTimes {
+        list-style: none;
+        border-radius: 4px;
+        background-color: grey;
+        text-align: center;
+      }
+      .li-listPeriods {
+        background-color: #EEDADA;
+      }
+      .li-header {
+        color: white;
+      }
+      .li-date {
+        font-size: x-large;
       }
     </style>
 
@@ -92,7 +108,7 @@
               Restart
             </button>-->
             <div class="col-sm-6 col-xs-12">
-              <button id="clearAll" class="btn btn-warning btn-block">
+              <button id="clearAll" class="btn btn-danger btn-block">
                 Clear All
               </button>
             </div>
